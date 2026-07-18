@@ -11,14 +11,15 @@
         body { background-color: var(--bg); color: var(--text-main); padding: 30px 5%; line-height: 1.6; }
         .card { background: var(--white); padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; border: 1px solid var(--border); overflow-x: auto;}
         .card-header { font-size: 20px; font-weight: 800; color: #1e3a8a; margin-bottom: 20px; border-bottom: 2px solid var(--bg); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
-        .btn { padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; background: #1e3a8a; color: white; transition: 0.3s; font-size: 14px; }
+        .btn { padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; background: #1e3a8a; color: white; transition: 0.3s; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
         .btn:hover { opacity: 0.9; }
         .btn-success { background: var(--secondary); }
         .btn-warning { background: #f59e0b; }
         .btn-info { background: #3b82f6; }
+        .btn-map { background: #ea4335; color: white; padding: 6px 12px; font-size: 12px; text-decoration: none; border-radius: 6px; font-weight: bold; }
         input, textarea, select { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; margin-top: 5px;}
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; min-width: 900px;}
-        th, td { padding: 15px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; min-width: 1100px;}
+        th, td { padding: 15px 10px; text-align: right; border-bottom: 1px solid var(--border); vertical-align: middle; }
         th { background: var(--bg); color: #64748b; }
         .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
         .badge-pending { background-color: #fee2e2; color: #991b1b; }
@@ -54,21 +55,22 @@
         <button class="btn" style="width: 100%; background: var(--secondary);" onclick="techLoginVerification()">تسجيل الدخول للمنظومة</button>
     </div>
 
-    <!-- لوحة التحكم المهام للطلب الميداني -->
+    <!-- لوحة التحكم المهام الميدانية للفني -->
     <div id="tech-dashboard" style="display: none;">
         <div class="card" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; border: none;">
             <h2>مرحباً بك في جدول مهامك الميدانية النشطة 🛠️</h2>
-            <p style="margin-top: 5px; opacity: 0.9;">حدث حالة البلاغ عند الحركة والوصول، ويلزم إرفاق تقرير مصور عند إغلاق المهمة.</p>
+            <p style="margin-top: 5px; opacity: 0.9;">حدث حالة البلاغ عند الحركة والوصول، واستخدم زر الخريطة للتوجه لموقع العميل مباشرة.</p>
         </div>
 
         <div class="card">
-            <div class="card-header">طلبات الصيانة الموجهة لك 🗒78;</div>
+            <div class="card-header">طلبات الصيانة الموجهة لك 🗒️</div>
             <table>
                 <thead>
                     <tr>
                         <th>العميل</th>
                         <th>رقم الجوال</th>
                         <th>الخدمة</th>
+                        <th>موقع العميل على الخريطة 📍</th>
                         <th>وصف العطل</th>
                         <th>صورة البلاغ</th>
                         <th>الحالة الحاليّة</th>
@@ -80,7 +82,7 @@
         </div>
     </div>
 
-    <!-- نافذة إغلاق البلاغ بالتقرير المصور الإجباري -->
+    <!-- نافذة إغلاق البلاغ بالتقرير المصور -->
     <div id="report-modal" class="modal-overlay" onclick="closeReportModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 style="color:#1e3a8a; margin-bottom:15px;">رفع التقرير المصور وإقفال الباقة 📸</h3>
@@ -142,7 +144,12 @@
 
         async function syncTechTasks() {
             try {
-                let reqs = await fetch(`${SUPABASE_URL}/rest/v1/requests?tech=eq.${encodeURIComponent(currentTechName)}&order=id.desc`, { headers }).then(r=>r.json());
+                // جلب الطلبات وجلب بيانات المستخدمين بالتوازي لربط الإحداثيات والخرائط
+                const [reqs, usrs] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/rest/v1/requests?tech=eq.${encodeURIComponent(currentTechName)}&order=id.desc`, { headers }).then(r=>r.json()),
+                    fetch(`${SUPABASE_URL}/rest/v1/users`, { headers }).then(r=>r.json())
+                ]);
+
                 let tasksHtml = '';
                 
                 if(reqs && reqs.length > 0) {
@@ -165,12 +172,25 @@
                             badgeClass = 'badge-success';
                         }
 
+                        // البحث عن إحداثيات العميل المسجلة في جدول المستخدمين
+                        let userRecord = usrs.find(u => u.phone && r.phone && u.phone.toString().trim() === r.phone.toString().trim());
+                        let mapLocationHtml = '';
+
+                        if(userRecord && userRecord.lat && userRecord.lng) {
+                            // إنشاء رابط خرائط جوجل المباشر باستخدام خطوط الطول والعرض لبيت العميل
+                            let googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${userRecord.lat},${userRecord.lng}`;
+                            mapLocationHtml = `<a href="${googleMapsUrl}" target="_blank" class="btn-map">🗺️ فتح في الخرائط</a><br><small style="color:#64748b; font-size:11px;">${userRecord.national_address || 'العنوان الوطني'}</small>`;
+                        } else {
+                            mapLocationHtml = `<span style="color:#94a3b8; font-size:12px;">📍 ${userRecord ? (userRecord.national_address || 'العنوان نصي فقط') : 'العنوان نصي فقط'}</span>`;
+                        }
+
                         let imgHtml = r.image ? `<img src="${r.image}" style="width:45px; height:45px; border-radius:6px; object-fit:cover; cursor:pointer;" onclick="openImageModal('${r.image}')">` : 'لا توجد';
 
                         tasksHtml += `<tr>
                             <td><strong>${r.user}</strong></td>
                             <td>${r.phone}</td>
                             <td>${r.service}</td>
+                            <td>${mapLocationHtml}</td>
                             <td>${r.desc || '-'}</td>
                             <td>${imgHtml}</td>
                             <td><span class="badge ${badgeClass}">${statusText}</span></td>
@@ -178,7 +198,7 @@
                         </tr>`;
                     });
                 } else {
-                    tasksHtml = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#94a3b8;">لا توجد مهام نشطة حالياً.</td></tr>`;
+                    tasksHtml = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">لا توجد مهام نشطة حالياً.</td></tr>`;
                 }
                 document.getElementById('tech-tasks-list').innerHTML = tasksHtml;
             } catch(e) { console.error(e); }
