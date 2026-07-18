@@ -1,8 +1,3 @@
-تفضل يا فهد، هذا هو الكود الكامل والمنظم لملف **لوحة الفنيين (`tech.html`)**.
-
-يحتوي هذا الملف على نظام تسجيل دخول مخصص للفنيين مربوط بقاعدة بيانات Supabase، مع عرض الطلبات المسندة للفني الحالي فقط، وإمكانية تحديث حالة الطلب إلى "مكتمل" وإضافة اسم الفني الذي باشر العمل لتوثيق الإنجاز:
-
-```html
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -19,14 +14,20 @@
         .btn { padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; background: #1e3a8a; color: white; transition: 0.3s; font-size: 14px; }
         .btn:hover { opacity: 0.9; }
         .btn-success { background: var(--secondary); }
-        input { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; margin-top: 5px;}
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; min-width: 800px;}
+        .btn-warning { background: #f59e0b; }
+        .btn-info { background: #3b82f6; }
+        input, textarea, select { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; margin-top: 5px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; min-width: 900px;}
         th, td { padding: 15px 10px; text-align: right; border-bottom: 1px solid var(--border); }
         th { background: var(--bg); color: #64748b; }
         .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .badge-pending { background-color: #fee2e2; color: #991b1b; }
+        .badge-way { background-color: #e0f2fe; color: #0369a1; }
         .badge-working { background-color: #fef3c7; color: #d97706; }
         .badge-success { background-color: #d1fae5; color: #065f46; }
         nav { background-color: var(--white); padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin:-30px -5.3% 30px -5.3%; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: var(--white); padding: 25px; border-radius: 16px; width: 90%; max-width: 500px; text-align: right; position: relative; }
     </style>
 </head>
 <body>
@@ -39,7 +40,7 @@
         </div>
     </nav>
 
-    <!-- واجهة تسجيل دخول الفني المعتمد -->
+    <!-- تسجيل دخول الفني -->
     <div id="tech-auth-card" class="card" style="max-width: 450px; margin: 60px auto; display: block;">
         <h2 style="text-align: center; margin-bottom: 20px; color: #1e3a8a;">تسجيل دخول الفنيين 👨‍🔧</h2>
         <div style="margin-bottom: 15px;">
@@ -53,25 +54,25 @@
         <button class="btn" style="width: 100%; background: var(--secondary);" onclick="techLoginVerification()">تسجيل الدخول للمنظومة</button>
     </div>
 
-    <!-- لوحة المهام المخصصة للفني -->
+    <!-- لوحة التحكم المهام للطلب الميداني -->
     <div id="tech-dashboard" style="display: none;">
         <div class="card" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; border: none;">
-            <h2>مرحباً بك في جدول مهامك اليومية النشطة 🛠️</h2>
-            <p style="margin-top: 5px; opacity: 0.9;">يرجى مراجعة بلاغات الأعطال وبدء أعمال الصيانة فوراً وتحديث الحالة عند المباشرة والإنجاز.</p>
+            <h2>مرحباً بك في جدول مهامك الميدانية النشطة 🛠️</h2>
+            <p style="margin-top: 5px; opacity: 0.9;">حدث حالة البلاغ عند الحركة والوصول، ويلزم إرفاق تقرير مصور عند إغلاق المهمة.</p>
         </div>
 
         <div class="card">
-            <div class="card-header">طلبات الصيانة الموجهة لك حصرًا 🗒️</div>
+            <div class="card-header">طلبات الصيانة الموجهة لك 🗒78;</div>
             <table>
                 <thead>
                     <tr>
                         <th>العميل</th>
                         <th>رقم الجوال</th>
-                        <th>الخدمة المطلوبة</th>
+                        <th>الخدمة</th>
                         <th>وصف العطل</th>
                         <th>صورة البلاغ</th>
                         <th>الحالة الحاليّة</th>
-                        <th>الإجراء وتحديث الإنجاز</th>
+                        <th>تحديث الحالة الميدانية</th>
                     </tr>
                 </thead>
                 <tbody id="tech-tasks-list"></tbody>
@@ -79,11 +80,29 @@
         </div>
     </div>
 
-    <!-- نافذة مكبرة لعرض صور الأعطال -->
-    <div id="image-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000;" onclick="closeImageModal()">
-        <div style="background: var(--white); padding: 25px; border-radius: 16px; max-width: 550px; text-align: center; position: relative;" onclick="event.stopPropagation()">
+    <!-- نافذة إغلاق البلاغ بالتقرير المصور الإجباري -->
+    <div id="report-modal" class="modal-overlay" onclick="closeReportModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 style="color:#1e3a8a; margin-bottom:15px;">رفع التقرير المصور وإقفال الباقة 📸</h3>
+            <input type="hidden" id="modal-task-id">
+            <div style="margin-bottom:15px;">
+                <label style="font-weight:bold;">ملخص أعمال الصيانة المنفذة:</label>
+                <textarea id="tech-report-desc" rows="3" placeholder="اكتب ماذا تم للإصلاح بالتفصيل..."></textarea>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="font-weight:bold;">صورة إثبات الإنجاز والتقرير:</label>
+                <input type="file" id="tech-report-img" accept="image/*" onchange="previewReportImage(this)">
+                <img id="report-img-preview" style="max-width:100%; max-height:120px; border-radius:8px; margin-top:10px; display:none;">
+            </div>
+            <button class="btn btn-success" style="width:100%;" onclick="submitFinalReport()">إقفال البلاغ وترحيل البيانات للتسوية</button>
+        </div>
+    </div>
+
+    <!-- نافذة مكبرة لمعاينة الصور -->
+    <div id="image-modal" class="modal-overlay" onclick="closeImageModal()">
+        <div class="modal-content" style="max-width:550px; text-align:center;" onclick="event.stopPropagation()">
             <span style="position: absolute; top: 10px; right: 15px; font-size: 26px; cursor: pointer; color: #1e3a8a;" onclick="closeImageModal()">&times;</span>
-            <img id="modal-viewer-img" src="" alt="معاينة العطل" style="max-width: 100%; max-height: 400px; border-radius: 8px; object-fit: contain;">
+            <img id="modal-viewer-img" src="" alt="معاينة" style="max-width: 100%; max-height: 400px; border-radius: 8px; object-fit: contain;">
         </div>
     </div>
 
@@ -93,13 +112,14 @@
         const headers = { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" };
 
         let currentTechName = localStorage.getItem('tech_approved_name') || '';
+        let tempReportImageBase64 = "";
 
         if(currentTechName) startTechDashboard();
 
         async function techLoginVerification() {
             let phone = document.getElementById('tech-login-phone').value.trim();
             let pass = document.getElementById('tech-login-pass').value.trim();
-            if(!phone || !pass) return alert("الرجاء إدخال رقم الجوال والرقم السري");
+            if(!phone || !pass) return alert("الرجاء إدخال البيانات كاملة");
 
             try {
                 let res = await fetch(`${SUPABASE_URL}/rest/v1/technicians?phone=eq.${phone}&password=eq.${pass}`, { headers }).then(r=>r.json());
@@ -107,74 +127,123 @@
                     currentTechName = res[0].name;
                     localStorage.setItem('tech_approved_name', currentTechName);
                     startTechDashboard();
-                } else {
-                    alert("⚠️ بيانات الدخول غير صحيحة أو حساب الفني غير مفعل!");
-                }
-            } catch(e) { alert("حدث خطأ أثناء الاتصال بقاعدة البيانات."); }
+                } else { alert("⚠️ بيانات الدخول غير صحيحة!"); }
+            } catch(e) { alert("حدث خطأ في الاتصال."); }
         }
 
-        function techLogout() {
-            localStorage.removeItem('tech_approved_name');
-            location.reload();
-        }
-
+        function techLogout() { localStorage.removeItem('tech_approved_name'); location.reload(); }
         function startTechDashboard() {
             document.getElementById('tech-auth-card').style.display = 'none';
             document.getElementById('tech-dashboard').style.display = 'block';
             document.getElementById('btn-logout').style.display = 'inline-block';
             document.getElementById('tech-name-display').innerText = "الفني: " + currentTechName;
-            syncTechTasks(); setInterval(syncTechTasks, 6000);
+            syncTechTasks(); setInterval(syncTechTasks, 5000);
         }
 
         async function syncTechTasks() {
             try {
-                // جلب الطلبات المسندة لهذا الفني بعينه
                 let reqs = await fetch(`${SUPABASE_URL}/rest/v1/requests?tech=eq.${encodeURIComponent(currentTechName)}&order=id.desc`, { headers }).then(r=>r.json());
-                
                 let tasksHtml = '';
+                
                 if(reqs && reqs.length > 0) {
                     reqs.forEach(r => {
-                        let isCompleted = r.status === 'مكتمل';
-                        let badgeClass = isCompleted ? 'badge-success' : 'badge-working';
-                        let actionButton = isCompleted ? 
-                            `<span style="color:var(--secondary); font-weight:bold;">✅ تم التقفيل</span>` : 
-                            `<button class="btn btn-success" style="padding:6px 14px;" onclick="completeTask(${r.id})">تأكيد الإنجاز 🏁</button>`;
-                        
-                        let imgHtml = r.image ? `<img src="${r.image}" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; cursor: pointer; border:1px solid var(--border);" onclick="openImageModal('${r.image}')">` : 'لا توجد صورة';
+                        let statusText = r.status || 'قيد الانتظار';
+                        let badgeClass = 'badge-pending';
+                        let actionButtons = '';
+
+                        if (statusText === 'جاري العمل' || statusText === 'قيد الانتظار') {
+                            actionButtons = `<button class="btn btn-info" onclick="updateMidianStatus(${r.id}, 'في الطريق')">🚖 تحركت (في الطريق)</button>`;
+                            badgeClass = 'badge-pending';
+                        } else if (statusText === 'في الطريق') {
+                            actionButtons = `<button class="btn btn-warning" onclick="updateMidianStatus(${r.id}, 'وصلت للموقع')">📍 وصلت للموقع</button>`;
+                            badgeClass = 'badge-way';
+                        } else if (statusText === 'وصلت للموقع') {
+                            actionButtons = `<button class="btn btn-success" onclick="openReportModal(${r.id})">📸 إنهاء ورفع تقرير مصور</button>`;
+                            badgeClass = 'badge-working';
+                        } else if (statusText === 'مكتمل') {
+                            actionButtons = `<span style="color:var(--secondary); font-weight:bold;">✅ تم التقفيل والترحيل</span>`;
+                            badgeClass = 'badge-success';
+                        }
+
+                        let imgHtml = r.image ? `<img src="${r.image}" style="width:45px; height:45px; border-radius:6px; object-fit:cover; cursor:pointer;" onclick="openImageModal('${r.image}')">` : 'لا توجد';
 
                         tasksHtml += `<tr>
                             <td><strong>${r.user}</strong></td>
                             <td>${r.phone}</td>
-                            <td><mark style="padding:2px 6px; background:#dbeafe; border-radius:4px; color:#1e40af;">${r.service}</mark></td>
-                            <td>${r.desc || 'لا يوجد وصف فرعي'}</td>
+                            <td>${r.service}</td>
+                            <td>${r.desc || '-'}</td>
                             <td>${imgHtml}</td>
-                            <td><span class="badge ${badgeClass}">${r.status}</span></td>
-                            <td>${actionButton}</td>
+                            <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                            <td>${actionButtons}</td>
                         </tr>`;
                     });
                 } else {
-                    tasksHtml = `<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:30px;">لا توجد مهام صيانة موجهة لك حالياً. مجدول كـ (بحث) 👍</td></tr>`;
+                    tasksHtml = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#94a3b8;">لا توجد مهام نشطة حالياً.</td></tr>`;
                 }
-                
                 document.getElementById('tech-tasks-list').innerHTML = tasksHtml;
-            } catch(e) { console.error("Error fetching tech tasks:", e); }
+            } catch(e) { console.error(e); }
         }
 
-        async function completeTask(id) {
-            if(!confirm("هل تود تأكيد إتمام الصيانة وإغلاق هذا البلاغ؟")) return;
+        async function updateMidianStatus(id, nextStatus) {
+            let payload = { status: nextStatus };
+            let nowIso = new Date().toISOString();
             
-            // تحديث حالة الطلب إلى مكتمل وتأكيد اسم الفني المنجز
-            let res = await fetch(`${SUPABASE_URL}/rest/v1/requests?id=eq.${id}`, {
-                method: "PATCH",
-                headers,
-                body: JSON.stringify({ status: 'مكتمل', tech: currentTechName })
-            });
+            if(nextStatus === 'في الطريق') payload.accepted_at = nowIso;
+            if(nextStatus === 'وصلت للموقع') payload.arrived_at = nowIso;
 
+            await fetch(`${SUPABASE_URL}/rest/v1/requests?id=eq.${id}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
+            syncTechTasks();
+        }
+
+        function openReportModal(id) {
+            document.getElementById('modal-task-id').value = id;
+            document.getElementById('tech-report-desc').value = '';
+            document.getElementById('tech-report-img').value = '';
+            document.getElementById('report-img-preview').style.display = 'none';
+            tempReportImageBase64 = "";
+            document.getElementById('report-modal').style.display = 'flex';
+        }
+        function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+
+        function previewReportImage(input) {
+            let file = input.files[0];
+            if(file) {
+                let reader = new FileReader();
+                reader.onload = (e) => {
+                    let img = new Image();
+                    img.onload = () => {
+                        let canvas = document.createElement('canvas');
+                        canvas.width = 400; canvas.height = 400;
+                        canvas.getContext('2d').drawImage(img, 0, 0, 400, 400);
+                        tempReportImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                        document.getElementById('report-img-preview').src = tempReportImageBase64;
+                        document.getElementById('report-img-preview').style.display = 'block';
+                    }
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function submitFinalReport() {
+            let id = document.getElementById('modal-task-id').value;
+            let desc = document.getElementById('tech-report-desc').value.trim();
+
+            if(!desc) return alert("⚠️ يرجى كتابة وصف أعمال الصيانة المنفذة للبلاغ!");
+            if(!tempReportImageBase64) return alert("⚠️ يرجى إلزامياً التقاط وصورة التقرير المصور للإنجاز!");
+
+            let payload = {
+                status: 'مكتمل',
+                report_desc: desc,
+                report_image: tempReportImageBase64,
+                completed_at: new Date().toISOString()
+            };
+
+            let res = await fetch(`${SUPABASE_URL}/rest/v1/requests?id=eq.${id}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
             if(res.ok) {
-                alert("✅ تم تحديث البلاغ بنجاح وإرسال الإشعار للوحة الإدارة والعميل!");
+                alert("✅ تم رفع التقرير وإقفال البلاغ وإشعار الإدارة بنجاح!");
+                closeReportModal();
                 syncTechTasks();
-            } else {
-                alert("فشل تحديث الحالة، يرجى التحقق من الشبكة.");
             }
         }
 
@@ -183,5 +252,3 @@
     </script>
 </body>
 </html>
-
-```
