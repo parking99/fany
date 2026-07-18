@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الفني | صيانة+</title>
+    <title>لوحة الفني المعتمد | صيانة+</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -27,6 +27,7 @@
         .badge-pending { background: #fef3c7; color: #d97706; }
         .badge-working { background: #dbeafe; color: #1d4ed8; }
         .badge-success { background: #d1fae5; color: var(--success); }
+        input { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 8px; margin-top: 5px; outline:none;}
     </style>
 </head>
 <body>
@@ -39,29 +40,35 @@
     </div>
 
     <nav>
-        <div class="logo">صيانة<span>+</span> (لوحة الفني)</div>
+        <div class="logo">صيانة<span>+</span> (نظام الفنيين)</div>
         <div>
             <span id="tech-name-display" style="font-weight: bold; margin-left: 15px; color: var(--primary);"></span>
-            <button class="btn btn-outline" style="border-color: red; color: red;" onclick="techLogout()">تسجيل خروج</button>
+            <button class="btn btn-outline" style="border-color: red; color: red; display:none;" id="btn-logout" onclick="techLogout()">تسجيل خروج</button>
         </div>
     </nav>
 
+    <!-- واجهة تسجيل الدخول المؤمنة بالكامل للفني -->
     <div id="tech-auth-card" class="card" style="max-width: 450px; margin: 40px auto; display: block;">
-        <h2 style="text-align: center; margin-bottom: 20px; color: var(--primary);">تسجيل دخول الفني 🛠️</h2>
-        <div style="margin-bottom: 20px;">
-            <label style="display:block; margin-bottom:8px; font-weight:bold;">اسم الفني المعتمَد</label>
-            <input type="text" id="tech-login-name" placeholder="أدخل اسمك الكامل" style="width:100%; padding:14px; border:1px solid var(--border); border-radius:8px;">
+        <h2 style="text-align: center; margin-bottom: 20px; color: var(--primary);">تسجيل دخول الفنيين 🔒</h2>
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight:bold;">رقم الجوال المسجل</label>
+            <input type="tel" id="tech-login-phone" placeholder="05XXXXXXXX">
         </div>
-        <button class="btn btn-primary" style="width: 100%;" onclick="techLogin()">دخول للنظام</button>
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight:bold;">الرقم السري</label>
+            <input type="password" id="tech-login-pass" placeholder="******">
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="techLoginVerification()">تسجيل الدخول ومزامنة المهام</button>
     </div>
 
+    <!-- لوحة المهام المعتمدة -->
     <div id="tech-dashboard" style="display: none;">
         <div class="card" style="background: linear-gradient(135deg, var(--secondary), #d97706); color: white; border: none;">
-            <h2>مرحباً بك.. نظام إدارة المهام والموقع الجغرافي للبيوت 👨‍🔧</h2>
+            <h2>مرحباً بك في جدول أعمالك الميداني اليومي الموجه 👨‍🔧</h2>
         </div>
         
         <div class="card">
-            <div class="card-header">المهام المتاحة وقيد التنفيذ 🔄 <span id="sync-status" style="font-size:12px; color:var(--success); display:none;">● متصل</span></div>
+            <div class="card-header">مهامك النشطة المسندة إليك حالياً 🔄 <span id="sync-status" style="font-size:12px; color:var(--success); display:none;">● متصل ومتزامن</span></div>
             <table>
                 <thead>
                     <tr>
@@ -82,7 +89,7 @@
         </div>
 
         <div class="card">
-            <div class="card-header">أعمالك المكتملة بنجاح 🏅</div>
+            <div class="card-header">سجل أعمالك المنتهية والمكتملة 🏅</div>
             <table>
                 <thead>
                     <tr>
@@ -104,28 +111,38 @@
         const SUPABASE_ANON_KEY = "sb_publishable__poVHB0UNhHJfqxUiXHB4g_EiVA_bD3"; 
         const headers = { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" };
 
-        let currentTech = localStorage.getItem('current_tech') || '';
+        let techName = localStorage.getItem('tech_approved_name') || '';
         let db = { requests: [], users: [] };
 
-        if(currentTech) showDashboard();
+        if(techName) startTechDashboard();
 
-        function techLogin() {
-            let name = document.getElementById('tech-login-name').value.trim();
-            if(!name) return alert("الرجاء إدخال اسم الفني");
-            currentTech = name;
-            localStorage.setItem('current_tech', name);
-            showDashboard();
+        async function techLoginVerification() {
+            let phone = document.getElementById('tech-login-phone').value.trim();
+            let pass = document.getElementById('tech-login-pass').value.trim();
+            if(!phone || !pass) return alert("الرجاء تعبئة بيانات الدخول");
+
+            try {
+                let res = await fetch(`${SUPABASE_URL}/rest/v1/technicians?phone=eq.${phone}&password=eq.${pass}`, { headers }).then(r=>r.json());
+                if(res && res.length > 0) {
+                    techName = res[0].name;
+                    localStorage.setItem('tech_approved_name', techName);
+                    startTechDashboard();
+                } else {
+                    alert("⚠️ خطأ في رقم الجوال أو الرقم السري! يرجى مراجعة الإدارة.");
+                }
+            } catch(e) { alert("فشل الاتصال بقاعدة البيانات."); }
         }
 
         function techLogout() {
-            localStorage.removeItem('current_tech'); currentTech = '';
+            localStorage.removeItem('tech_approved_name');
             location.reload();
         }
 
-        function showDashboard() {
+        function startTechDashboard() {
             document.getElementById('tech-auth-card').style.display = 'none';
             document.getElementById('tech-dashboard').style.display = 'block';
-            document.getElementById('tech-name-display').innerText = "الفني: " + currentTech;
+            document.getElementById('btn-logout').style.display = 'inline-block';
+            document.getElementById('tech-name-display').innerText = "الفني المسجل: " + techName;
             silentSync(); setInterval(silentSync, 4000);
         }
 
@@ -149,29 +166,32 @@
                 let badge = r.status === 'مكتمل' ? 'badge-success' : (r.status === 'جاري العمل' ? 'badge-working' : 'badge-pending');
                 let imgHtml = r.image ? `<img src="${r.image}" style="width: 45px; height: 45px; border-radius: 4px; object-fit: cover; cursor: pointer;" onclick="openImageModal('${r.image}')">` : 'لا توجد';
 
-                if(r.status !== 'مكتمل') {
-                    let btnTxt = r.status === 'قيد الانتظار' ? 'استلم المهمة' : 'إنهاء الطلب';
-                    let actionStatus = r.status === 'قيد الانتظار' ? 'جاري العمل' : 'مكتمل';
-                    let btnStyle = r.status === 'قيد الانتظار' ? 'btn-primary' : 'btn-secondary';
-                    
-                    let clientUser = db.users.find(u => u.phone && r.phone && u.phone.toString() === r.phone.toString());
-                    let clientAddress = clientUser ? clientUser.national_address : 'غير متوفر';
-                    let clientHouseImg = clientUser && clientUser.house_image ? `<img src="${clientUser.house_image}" style="width: 45px; height: 45px; border-radius: 4px; object-fit: cover; cursor: pointer;" onclick="openImageModal('${clientUser.house_image}')">` : 'لا توجد';
-                    
-                    let mapsUrl = "https://www.google.com/maps/search/?api=1&query=";
-                    if (clientUser && clientUser.lat && clientUser.lng) mapsUrl += `${clientUser.lat},${clientUser.lng}`;
-                    else mapsUrl += encodeURIComponent(clientAddress);
-                    
-                    let directionsBtn = `<a href="${mapsUrl}" target="_blank" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; display:inline-block;">🗺️ الاتجاهات بالخريطة</a>`;
-                    
-                    techActive += `<tr>
-                        <td>${r.user}</td><td>${r.phone}</td><td>${r.service}</td><td>${r.desc}</td><td>${imgHtml}</td><td>${clientAddress}</td><td>${clientHouseImg}</td><td>${directionsBtn}</td><td><span class="badge ${badge}">${r.status}</span></td>
-                        <td><button class="btn ${btnStyle}" style="padding:6px 12px" onclick="changeStatus(${r.id}, '${actionStatus}')">${btnTxt}</button></td>
-                    </tr>`;
-                } else if(r.tech === currentTech) {
-                    techDone += `<tr>
-                        <td>${r.user}</td><td>${r.service}</td><td>${imgHtml}</td><td>${r.start || '-'}</td><td>${r.end || '-'}</td><td><span class="badge badge-success">مكتمل</span></td>
-                    </tr>`;
+                // لا يظهر للفني إلا الطلبات الموجهة له بالاسم من الإدارة
+                if(r.tech === techName) {
+                    if(r.status !== 'مكتمل') {
+                        let btnTxt = r.status === 'قيد الانتظار' ? 'استلم المهمة' : 'إنهاء الطلب ورفع التقارير';
+                        let actionStatus = r.status === 'قيد الانتظار' ? 'جاري العمل' : 'مكتمل';
+                        let btnStyle = r.status === 'قيد الانتظار' ? 'btn-primary' : 'btn-secondary';
+                        
+                        let clientUser = db.users.find(u => u.phone && r.phone && u.phone.toString() === r.phone.toString());
+                        let clientAddress = clientUser ? clientUser.national_address : 'غير متوفر';
+                        let clientHouseImg = clientUser && clientUser.house_image ? `<img src="${clientUser.house_image}" style="width: 45px; height: 45px; border-radius: 4px; object-fit: cover; cursor: pointer;" onclick="openImageModal('${clientUser.house_image}')">` : 'لا توجد';
+                        
+                        let mapsUrl = "https://www.google.com/maps/search/?api=1&query=";
+                        if (clientUser && clientUser.lat && clientUser.lng) mapsUrl += `${clientUser.lat},${clientUser.lng}`;
+                        else mapsUrl += encodeURIComponent(clientAddress);
+                        
+                        let directionsBtn = `<a href="${mapsUrl}" target="_blank" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; display:inline-block;">🗺️ فتح خارطة بيت العميل</a>`;
+                        
+                        techActive += `<tr>
+                            <td>${r.user}</td><td>${r.phone}</td><td>${r.service}</td><td>${r.desc}</td><td>${imgHtml}</td><td>${clientAddress}</td><td>${clientHouseImg}</td><td>${directionsBtn}</td><td><span class="badge ${badge}">${r.status}</span></td>
+                            <td><button class="btn ${btnStyle}" style="padding:6px 12px" onclick="changeStatus(${r.id}, '${actionStatus}')">${btnTxt}</button></td>
+                        </tr>`;
+                    } else {
+                        techDone += `<tr>
+                            <td>${r.user}</td><td>${r.service}</td><td>${imgHtml}</td><td>${r.start || '-'}</td><td>${r.end || '-'}</td><td><span class="badge badge-success">مكتمل ✅</span></td>
+                        </tr>`;
+                    }
                 }
             });
             document.getElementById('tech-active-list').innerHTML = techActive;
@@ -181,7 +201,7 @@
         async function changeStatus(id, newStatus) {
             let timeNow = new Date().toLocaleTimeString('ar-SA');
             let payload = { status: newStatus };
-            if(newStatus === 'جاري العمل') { payload.tech = currentTech; payload.start = timeNow; }
+            if(newStatus === 'جاري العمل') { payload.start = timeNow; }
             else if (newStatus === 'مكتمل') { payload.end = timeNow; }
             
             await fetch(`${SUPABASE_URL}/rest/v1/requests?id=eq.${id}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
